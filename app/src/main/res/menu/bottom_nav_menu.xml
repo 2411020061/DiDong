@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/nav_exercise" android:icon="@drawable/ic_nav_exercise" android:title="Bài tập" />
+    <item android:id="@+id/nav_tracking" android:icon="@drawable/ic_nav_tracking" android:title="Theo dõi" />
+</menu>

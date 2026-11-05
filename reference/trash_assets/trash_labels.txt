@@ -1,0 +1,12 @@
+Battery
+Biological
+Brown-glass
+Paper/Cardboard
+Clothes
+Green-glass
+Metal
+Paper
+Plastic
+Shoes
+Trash / Other waste
+White-glass

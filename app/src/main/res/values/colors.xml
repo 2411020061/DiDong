@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Core Dark Theme -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="brand_green">#0AA665</color>
+    <color name="brand_green_dark">#087548</color>
+    <color name="brand_mint">#E8F7EF</color>
+    <color name="brand_blue">#2788CB</color>
+    <color name="brand_navy">#10234A</color>
+    <color name="brand_slate">#607492</color>
+    <color name="dark_bg">#0A0E17</color>
+    <color name="dark_surface">#131927</color>
+    <color name="dark_surface_card">#161F30</color>
+    <color name="dark_card_stroke">#1F2B42</color>
+
+    <!-- Cyan Accent -->
+    <color name="cyan_primary">#00E5FF</color>
+    <color name="cyan_light">#80D8FF</color>
+    <color name="cyan_dark">#00B0FF</color>
+    <color name="cyan_badge_bg">#1A00E5FF</color>
+    <color name="cyan_glow">#3300E5FF</color>
+
+    <!-- Green Accent -->
+    <color name="neon_green">#00E676</color>
+    <color name="green_badge_bg">#1A00E676</color>
+
+    <!-- Amber Warning -->
+    <color name="amber_warning">#FFC107</color>
+    <color name="amber_warning_bg">#1A2B220B</color>
+    <color name="amber_warning_stroke">#524112</color>
+
+    <!-- Text colors -->
+    <color name="text_white">#FFFFFF</color>
+    <color name="text_slate">#94A3B8</color>
+    <color name="text_sub">#64748B</color>
+
+    <!-- Navigation & Badges -->
+    <color name="nav_bg">#0D111A</color>
+    <color name="overlay_dark">#CC0A0E17</color>
+</resources>

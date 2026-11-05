@@ -1,0 +1,18 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Base.Theme.EcoScan" parent="Theme.Material3.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/white</item>
+        <item name="android:navigationBarColor">@color/white</item>
+        <item name="android:windowBackground">@color/white</item>
+        <item name="colorPrimary">@color/brand_green</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorPrimaryContainer">@color/brand_mint</item>
+        <item name="colorOnPrimaryContainer">@color/brand_green_dark</item>
+        <item name="colorSecondary">@color/brand_blue</item>
+        <item name="colorSecondaryContainer">@color/brand_mint</item>
+        <item name="colorOnSecondaryContainer">@color/brand_green_dark</item>
+        <item name="android:textColorPrimary">@color/brand_navy</item>
+        <item name="android:textColorSecondary">@color/brand_slate</item>
+    </style>
+
+    <style name="Theme.EcoScan" parent="Base.Theme.EcoScan" />
+</resources>

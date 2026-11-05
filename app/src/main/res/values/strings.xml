@@ -1,0 +1,32 @@
+<resources>
+    <string name="app_name">BodyPoint AI</string>
+    <string name="title_motion_intelligence">MOTION INTELLIGENCE</string>
+    <string name="headline_precision">PRECISION IN EVERY MOVEMENT</string>
+    <string name="title_realtime_tracking">Real-time AI Body\nLandmark Tracking</string>
+    <string name="desc_realtime_tracking">Track 33 body keypoints with millimeter precision, measure joint angles, and analyze body posture instantly.</string>
+    <string name="chip_keypoints">• 33 Joint Keypoints</string>
+    <string name="chip_skeleton">• Live Skeleton Tracking</string>
+    <string name="chip_angles">• Angle &amp; Posture Analytics</string>
+    <string name="btn_start_body_camera">Start Body Camera</string>
+    <string name="privacy_tagline">Your movement. Your data. Private by design.</string>
+
+    <string name="title_body_camera">Body camera</string>
+    <string name="status_live_fps">• LIVE - 30 FPS</string>
+    <string name="tab_full_body">Full Body</string>
+    <string name="tab_upper_body">Upper Body</string>
+    <string name="tab_joint_detail">Joint Detail</string>
+    <string name="keep_full_body">Keep your full body inside the frame</string>
+    <string name="landmarks_tracked">33/33 Body Landmarks Tracked • Confidence: 99%</string>
+    <string name="photo_analysis">PHOTO ANALYSIS</string>
+    <string name="label_gallery">Gallery</string>
+    <string name="label_timer">3s timer</string>
+
+    <string name="title_capture_analysis">Capture analysis</string>
+    <string name="title_posture_symmetry">Posture &amp; symmetry</string>
+    <string name="title_session_history">Session history</string>
+    <string name="subtitle_movement_over_time">YOUR MOVEMENT, OVER TIME</string>
+
+    <string name="nav_scan">Scan</string>
+    <string name="nav_analysis">Analysis</string>
+    <string name="nav_history">History</string>
+</resources>

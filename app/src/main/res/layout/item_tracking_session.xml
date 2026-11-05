@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:background="@drawable/bg_home_feature" android:gravity="center_vertical"
+    android:minHeight="78dp" android:orientation="horizontal"
+    android:paddingStart="16dp" android:paddingEnd="16dp"
+    android:paddingTop="12dp" android:paddingBottom="12dp">
+    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+        android:layout_weight="1" android:orientation="vertical">
+        <TextView android:id="@+id/sessionTitle" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:textColor="@color/brand_navy"
+            android:textSize="16sp" android:textStyle="bold" />
+        <TextView android:id="@+id/sessionDate" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="3dp"
+            android:textColor="@color/brand_slate" android:textSize="13sp" />
+    </LinearLayout>
+    <TextView android:id="@+id/btnSessionChat" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:layout_marginStart="8dp"
+        android:background="@drawable/bg_exercise_pill"
+        android:paddingHorizontal="11dp" android:paddingVertical="7dp"
+        android:text="💬 Chat AI" android:textColor="@color/brand_green_dark"
+        android:textSize="13sp" android:textStyle="bold"
+        android:clickable="true" android:focusable="true" />
+</LinearLayout>

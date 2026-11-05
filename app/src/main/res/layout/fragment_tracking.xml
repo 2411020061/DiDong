@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="#FAFCFB" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:paddingStart="18dp" android:paddingEnd="18dp"
+        android:paddingTop="18dp" android:paddingBottom="24dp">
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="Theo dõi"
+            android:textColor="@color/brand_navy" android:textSize="29sp"
+            android:textStyle="bold" />
+
+        <vn.edu.mku.ecoscan.ui.TrackingChartView android:id="@+id/trackingChart"
+            android:layout_width="match_parent" android:layout_height="220dp"
+            android:layout_marginTop="16dp" android:background="@drawable/bg_exercise_stat"
+            android:padding="8dp" />
+
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="22dp" android:text="Lịch luyện tập"
+            android:textColor="@color/brand_navy" android:textSize="19sp"
+            android:textStyle="bold" />
+        <LinearLayout android:id="@+id/trackingHistory"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" android:orientation="vertical" />
+    </LinearLayout>
+</ScrollView>
