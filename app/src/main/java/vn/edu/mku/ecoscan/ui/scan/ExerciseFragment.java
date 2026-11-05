@@ -15,6 +15,7 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
 import android.util.Rational;
+import android.util.Size;
 import android.view.LayoutInflater;
 import android.view.Surface;
 import android.view.View;
@@ -50,7 +51,6 @@ import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker;
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult;
 
 import java.text.SimpleDateFormat;
-import java.nio.ByteBuffer;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -95,10 +95,26 @@ public class ExerciseFragment extends Fragment {
             Surface.ROTATION_0, Surface.ROTATION_90,
             Surface.ROTATION_180, Surface.ROTATION_270
     };
-    private int rotationIndex = 1;
+    private int rotationIndex = 0;
     private volatile boolean webcamRunning, hostMode;
     private Bitmap displayedWebcamFrame;
     private boolean modelLoading;
+    private final Handler feedbackHandler = new Handler(Looper.getMainLooper());
+    private long lastPoseAt;
+    private final Runnable stalePoseCheck = new Runnable() {
+        @Override public void run() {
+            if (getView() == null || finished) return;
+            if (lastPoseAt > 0 && SystemClock.elapsedRealtime() - lastPoseAt > 1200) {
+                lastPoseAt = 0;
+                overlay.setMediaPipePose(null, 1, 1, frontCamera, null);
+                overlay.setPersonBox(null);
+                updatePose(new NeckPoseEvaluator.Result(false,
+                        NeckPoseEvaluator.StretchType.NONE,
+                        "Chưa nhận được tư thế mới · kiểm tra camera"));
+            }
+            feedbackHandler.postDelayed(this, 300);
+        }
+    };
     private final PostureHoldTimer holdTimer = new PostureHoldTimer(15000, 1200);
     private final PoseAccuracyTracker accuracyTracker = new PoseAccuracyTracker();
     private final ActivityResultLauncher<String> cameraPermission = registerForActivityResult(
@@ -181,14 +197,19 @@ public class ExerciseFragment extends Fragment {
                         webcamSession.incrementAndGet();
                         startCamera();
                     })
+                    .setNeutralButton("Dùng CameraX", (dialog, which) -> {
+                        WebcamBridge.clearConnection(requireContext());
+                        startCamera();
+                    })
                     .setNegativeButton("Hủy", null).show();
         });
         timer = root.findViewById(R.id.exerciseTimer);
-        timer.setVisibility(View.GONE);
+        timer.setSeconds(15);
+        timer.setVisibility(View.VISIBLE);
         recording = root.findViewById(R.id.exerciseRecording);
-        recording.setVisibility(View.GONE);
+        recording.setVisibility(View.VISIBLE);
         coach = root.findViewById(R.id.exerciseCoach);
-        coach.setVisibility(View.GONE);
+        coach.setVisibility(View.VISIBLE);
         posture = root.findViewById(R.id.exerciseLandmarks);
         root.findViewById(R.id.exerciseCard).setVisibility(View.VISIBLE);
         progress = root.findViewById(R.id.exerciseProgress);
@@ -235,10 +256,12 @@ public class ExerciseFragment extends Fragment {
         } else {
             cameraPermission.launch(Manifest.permission.CAMERA);
         }
+        feedbackHandler.postDelayed(stalePoseCheck, 300);
         return root;
     }
 
     private void startCamera() {
+        holdTimer.update(false, SystemClock.elapsedRealtime());
         cameraStatus.setText("Đang mở camera…");
         start.setVisibility(View.GONE);
         guideImage.setVisibility(View.GONE);
@@ -262,6 +285,10 @@ public class ExerciseFragment extends Fragment {
                 }
             });
         } else {
+            webcamRunning = false;
+            webcamSession.incrementAndGet();
+            hostMode = false;
+            hostPreview.setVisibility(View.GONE);
             preview.setVisibility(View.VISIBLE);
             preview.post(this::bindCamera);
         }
@@ -402,6 +429,7 @@ public class ExerciseFragment extends Fragment {
 
     private void bindCamera() {
         if (!isAdded() || getView() == null || finished) return;
+        if (cameraActions != null) cameraActions.setVisibility(View.VISIBLE);
         if (preview.getViewPort() == null) {
             preview.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
                 @Override public void onGlobalLayout() {
@@ -440,7 +468,8 @@ public class ExerciseFragment extends Fragment {
                 Preview.Builder previewBuilder = new Preview.Builder();
                 ImageAnalysis.Builder analysisBuilder = new ImageAnalysis.Builder()
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                        .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888);
+                        .setTargetResolution(new Size(640, 480))
+                        .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888);
 
                 int displayRotation = preview.getDisplay() != null
                         ? preview.getDisplay().getRotation() : Surface.ROTATION_0;
@@ -501,7 +530,7 @@ public class ExerciseFragment extends Fragment {
         }
         boolean proxyClosed = false;
         try {
-            Bitmap raw = copyRgba(proxy);
+            Bitmap raw = copyYuv(proxy);
             int rotation = proxy.getImageInfo().getRotationDegrees();
             Rect cropRect = proxy.getCropRect();
             float[] uprightCrop = PoseOverlayTransform.rotateCrop(cropRect.left, cropRect.top,
@@ -567,10 +596,16 @@ public class ExerciseFragment extends Fragment {
 
             NeckPoseEvaluator.Result displayedAssessment = assessment;
             final List<NormalizedLandmark> detectedLandmarks = landmarks;
+            final float[] personBox = yoloPoseDetector == null ? null : yoloPoseDetector.getPersonBox();
             if (isAdded()) requireActivity().runOnUiThread(() -> {
                 if (getView() == null || finished) return;
+                lastPoseAt = SystemClock.elapsedRealtime();
                 overlay.setMediaPipePose(detectedLandmarks, imageWidth, imageHeight,
                         frontCamera, uprightCrop);
+                overlay.setPersonBox(personBox);
+                cameraStatus.setText(detectedLandmarks == null
+                        ? "Chưa nhận thấy người · đưa đầu và vai vào hình"
+                        : "● Đang nhận diện tư thế");
                 updatePose(displayedAssessment);
             });
         } catch (Exception e) {
@@ -591,36 +626,15 @@ public class ExerciseFragment extends Fragment {
         });
     }
 
-    private Bitmap copyRgba(ImageProxy proxy) {
+    private Bitmap copyYuv(ImageProxy proxy) {
+        ImageProxy.PlaneProxy[] planes = proxy.getPlanes();
+        if (planes.length != 3) throw new IllegalArgumentException("Expected YUV camera planes");
         int width = proxy.getWidth(), height = proxy.getHeight();
-        ImageProxy.PlaneProxy plane = proxy.getPlanes()[0];
-        ByteBuffer source = plane.getBuffer().duplicate();
-        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        if (plane.getPixelStride() == 4 && plane.getRowStride() == width * 4) {
-            source.rewind();
-            bitmap.copyPixelsFromBuffer(source);
-            return bitmap;
-        }
-        ByteBuffer packed = ByteBuffer.allocateDirect(width * height * 4);
-        if (plane.getPixelStride() == 4) {
-            byte[] rowBytes = new byte[width * 4];
-            for (int row = 0; row < height; row++) {
-                source.position(row * plane.getRowStride());
-                source.get(rowBytes);
-                packed.put(rowBytes);
-            }
-        } else {
-            for (int row = 0; row < height; row++) {
-                for (int column = 0; column < width; column++) {
-                    int offset = row * plane.getRowStride() + column * plane.getPixelStride();
-                    for (int channel = 0; channel < 4; channel++)
-                        packed.put(source.get(offset + channel));
-                }
-            }
-        }
-        packed.flip();
-        bitmap.copyPixelsFromBuffer(packed);
-        return bitmap;
+        int[] pixels = Yuv420Pixels.toArgb(width, height,
+                planes[0].getBuffer(), planes[0].getRowStride(), planes[0].getPixelStride(),
+                planes[1].getBuffer(), planes[1].getRowStride(), planes[1].getPixelStride(),
+                planes[2].getBuffer(), planes[2].getRowStride(), planes[2].getPixelStride());
+        return Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888);
     }
 
     private void updatePose(NeckPoseEvaluator.Result result) {
@@ -632,7 +646,7 @@ public class ExerciseFragment extends Fragment {
         percent.setText(accuracyTracker.percent() + "%");
         posture.setText(result.correct
                 ? (exerciseType == ExerciseType.NECK
-                    ? (result.type == NeckPoseEvaluator.StretchType.SIDE ? "Nghiêng bên" : "Cúi chéo")
+                    ? (result.type == NeckPoseEvaluator.StretchType.SIDE ? "Đúng · Nghiêng bên" : "Đúng · Cúi chéo")
                     : "Đúng tư thế")
                 : "Chưa đúng");
         recording.setText(result.correct ? "● Đang ghi nhận" : "● Chưa ghi nhận");
@@ -663,6 +677,7 @@ public class ExerciseFragment extends Fragment {
     }
 
     @Override public void onDestroyView() {
+        feedbackHandler.removeCallbacks(stalePoseCheck);
         webcamRunning = false;
         webcamSession.incrementAndGet();
         webcamExecutor.shutdownNow();

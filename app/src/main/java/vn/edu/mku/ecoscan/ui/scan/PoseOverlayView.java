@@ -18,6 +18,14 @@ public class PoseOverlayView extends View {
     private Paint dotPaint;
     private Paint dotBorderPaint;
     private Paint linePaint;
+    private final Paint boxPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private float[] personBox;
+    private boolean correct;
+
+    public void setPersonBox(float[] box) {
+        personBox = box == null ? null : box.clone();
+        invalidate();
+    }
 
     private List<NormalizedLandmark> mediaPipePose;
     private float[] mediaPipeCrop;
@@ -89,7 +97,8 @@ public class PoseOverlayView extends View {
     }
 
     public void setExerciseCorrectness(boolean correct) {
-        int color = Color.parseColor(correct ? "#12C875" : "#00E5FF");
+        this.correct = correct;
+        int color = Color.parseColor(correct ? "#087D4A" : "#FFB300");
         dotPaint.setColor(color);
         linePaint.setColor(color);
         invalidate();
@@ -102,9 +111,36 @@ public class PoseOverlayView extends View {
         int viewWidth = getWidth();
         int viewHeight = getHeight();
 
+        if (mediaPipePose != null && personBox != null) {
+            drawPersonBox(canvas, viewWidth, viewHeight);
+        }
         if (mediaPipePose != null) {
             drawMediaPipePose(canvas, viewWidth, viewHeight);
         }
+    }
+
+    private void drawPersonBox(Canvas canvas, int width, int height) {
+        float[] crop = mediaPipeCrop == null
+                ? new float[] {0, 0, imageWidth, imageHeight} : mediaPipeCrop;
+        float[] a = PoseOverlayTransform.map(personBox[0], personBox[1], imageWidth,
+                imageHeight, crop, width, height, isFrontCamera);
+        float[] b = PoseOverlayTransform.map(personBox[2], personBox[3], imageWidth,
+                imageHeight, crop, width, height, isFrontCamera);
+        float left = Math.max(2, Math.min(a[0], b[0]));
+        float right = Math.min(width - 2, Math.max(a[0], b[0]));
+        float top = Math.max(2, Math.min(a[1], b[1]));
+        float bottom = Math.min(height - 2, Math.max(a[1], b[1]));
+        if (left >= right || top >= bottom) return;
+        float d = getResources().getDisplayMetrics().density;
+        boxPaint.setColor(Color.parseColor(correct ? "#087D4A" : "#FFB300"));
+        boxPaint.setStyle(Paint.Style.STROKE);
+        boxPaint.setStrokeWidth(3 * d);
+        canvas.drawRect(left, top, right, bottom, boxPaint);
+        boxPaint.setStyle(Paint.Style.FILL);
+        boxPaint.setTextSize(14 * d);
+        canvas.drawText(String.format(java.util.Locale.US, "person %.2f · %s",
+                personBox[4], correct ? "Đúng" : "Chưa đúng"), left + 4 * d,
+                Math.min(bottom - 4 * d, top + 20 * d), boxPaint);
     }
 
     private void drawMediaPipePose(Canvas canvas, int viewWidth, int viewHeight) {

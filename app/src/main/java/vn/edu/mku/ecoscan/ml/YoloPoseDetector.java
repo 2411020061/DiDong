@@ -3,6 +3,10 @@ package vn.edu.mku.ecoscan.ml;
 import android.content.Context;
 import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Rect;
 import com.google.mediapipe.tasks.components.containers.NormalizedLandmark;
 import org.tensorflow.lite.Interpreter;
 
@@ -21,12 +25,18 @@ public class YoloPoseDetector implements AutoCloseable {
     private static final int INPUT_SIZE = 640;
     private static final int NUM_ANCHORS = 8400;
     private static final int NUM_ATTRS = 56;
-    private static final float CONF_THRESHOLD = 0.15f;
+    private static final float CONF_THRESHOLD = 0.5f;
 
     private final Interpreter interpreter;
     private final ByteBuffer inputBuffer;
     private final int[] intValues;
     private final float[][][] output;
+
+    private float[] personBox;
+
+    public synchronized float[] getPersonBox() {
+        return personBox == null ? null : personBox.clone();
+    }
 
     // Mapping from COCO 17 keypoints to MediaPipe 33 landmarks
     private static final int[] COCO_TO_MEDIAPIPE = new int[] {
@@ -83,13 +93,18 @@ public class YoloPoseDetector implements AutoCloseable {
     }
 
     public synchronized List<NormalizedLandmark> detect(Bitmap bitmap) {
+        personBox = null;
         if (bitmap == null || interpreter == null) return null;
 
-        Bitmap scaled = Bitmap.createScaledBitmap(bitmap, INPUT_SIZE, INPUT_SIZE, true);
+        PoseLetterbox geometry = new PoseLetterbox(bitmap.getWidth(), bitmap.getHeight(), INPUT_SIZE);
+        Bitmap scaled = Bitmap.createBitmap(INPUT_SIZE, INPUT_SIZE, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(scaled);
+        canvas.drawColor(Color.rgb(114, 114, 114));
+        canvas.drawBitmap(bitmap, null, new Rect(geometry.left, geometry.top,
+                geometry.left + geometry.width, geometry.top + geometry.height),
+                new Paint(Paint.FILTER_BITMAP_FLAG));
         scaled.getPixels(intValues, 0, INPUT_SIZE, 0, 0, INPUT_SIZE, INPUT_SIZE);
-        if (scaled != bitmap) {
-            scaled.recycle();
-        }
+        scaled.recycle();
 
         inputBuffer.rewind();
         // R channel
@@ -107,12 +122,32 @@ public class YoloPoseDetector implements AutoCloseable {
 
         interpreter.run(inputBuffer, output);
 
-        float[][] out0 = output[0];
-        List<DetectionCandidate> candidates = new ArrayList<>();
+        DetectionCandidate best = decode(output[0]);
+        if (best == null) return null;
+        personBox = new float[] {geometry.x(best.x1), geometry.y(best.y1),
+                geometry.x(best.x2), geometry.y(best.y2), best.score};
 
-        for (int a = 0; a < NUM_ANCHORS; a++) {
+        List<NormalizedLandmark> landmarks = new ArrayList<>(33);
+        for (int i = 0; i < 33; i++) {
+            int src = COCO_TO_MEDIAPIPE[i];
+            float x = geometry.x(best.kx[src]);
+            float y = geometry.y(best.ky[src]);
+            float c = best.kc[src];
+            if (i >= 17 && i <= 22) c = 0f;
+
+            landmarks.add(NormalizedLandmark.create(x, y, 0f, Optional.of(c), Optional.empty()));
+        }
+
+        return landmarks;
+    }
+
+    /** Decodes this model's normalized, post-sigmoid output; no JNI required. */
+    public static DetectionCandidate decode(float[][] out0) {
+        DetectionCandidate best = null;
+        for (int a = 0; a < out0[0].length; a++) {
             float rawScore = out0[4][a];
-            float score = 1.0f / (1.0f + (float) Math.exp(-rawScore));
+            // This export includes sigmoid and coordinate normalization in its graph.
+            float score = rawScore;
             if (score >= CONF_THRESHOLD) {
                 float cx = out0[0][a];
                 float cy = out0[1][a];
@@ -131,65 +166,16 @@ public class YoloPoseDetector implements AutoCloseable {
                     float rawY = out0[5 + k * 3 + 1][a];
                     float rawKc = out0[5 + k * 3 + 2][a];
 
-                    kx[k] = Math.max(0f, Math.min(1f, rawX / (float) INPUT_SIZE));
-                    ky[k] = Math.max(0f, Math.min(1f, rawY / (float) INPUT_SIZE));
-                    float sigKc = 1.0f / (1.0f + (float) Math.exp(-rawKc));
-                    kc[k] = Math.max(0.6f, sigKc);
+                    kx[k] = Math.max(0f, Math.min(1f, rawX));
+                    ky[k] = Math.max(0f, Math.min(1f, rawY));
+                    kc[k] = rawKc;
                 }
-                candidates.add(new DetectionCandidate(score, x1, y1, x2, y2, kx, ky, kc));
+                if (best == null || score > best.score)
+                    best = new DetectionCandidate(score, x1, y1, x2, y2, kx, ky, kc);
             }
         }
 
-        if (candidates.isEmpty()) {
-            return null;
-        }
-
-        candidates.sort((a, b) -> Float.compare(b.score, a.score));
-
-        List<DetectionCandidate> selected = new ArrayList<>();
-        for (DetectionCandidate cand : candidates) {
-            boolean keep = true;
-            for (DetectionCandidate sel : selected) {
-                if (calculateIoU(cand, sel) > 0.45f) {
-                    keep = false;
-                    break;
-                }
-            }
-            if (keep) {
-                selected.add(cand);
-                break;
-            }
-        }
-
-        if (selected.isEmpty()) {
-            return null;
-        }
-
-        DetectionCandidate best = selected.get(0);
-
-        List<NormalizedLandmark> landmarks = new ArrayList<>(33);
-        for (int i = 0; i < 33; i++) {
-            int src = COCO_TO_MEDIAPIPE[i];
-            float x = best.kx[src];
-            float y = best.ky[src];
-            float c = best.kc[src];
-
-            if (i == 19) {
-                float otherX = best.kc[10] > 0.3f ? best.kx[10] : x;
-                float otherY = best.kc[10] > 0.3f ? best.ky[10] : y;
-                x = x + (otherX - x) * 0.5f;
-                y = y + (otherY - y) * 0.5f;
-            } else if (i == 20) {
-                float otherX = best.kc[9] > 0.3f ? best.kx[9] : x;
-                float otherY = best.kc[9] > 0.3f ? best.ky[9] : y;
-                x = x + (otherX - x) * 0.5f;
-                y = y + (otherY - y) * 0.5f;
-            }
-
-            landmarks.add(NormalizedLandmark.create(x, y, 0f, Optional.of(c), Optional.empty()));
-        }
-
-        return landmarks;
+        return best;
     }
 
     public static class DetectionCandidate {
@@ -200,23 +186,6 @@ public class YoloPoseDetector implements AutoCloseable {
             this.x1 = x1; this.y1 = y1; this.x2 = x2; this.y2 = y2;
             this.kx = kx; this.ky = ky; this.kc = kc;
         }
-    }
-
-    private static float calculateIoU(DetectionCandidate a, DetectionCandidate b) {
-        float interX1 = Math.max(a.x1, b.x1);
-        float interY1 = Math.max(a.y1, b.y1);
-        float interX2 = Math.min(a.x2, b.x2);
-        float interY2 = Math.min(a.y2, b.y2);
-
-        float interW = Math.max(0f, interX2 - interX1);
-        float interH = Math.max(0f, interY2 - interY1);
-        float interArea = interW * interH;
-
-        float areaA = (a.x2 - a.x1) * (a.y2 - a.y1);
-        float areaB = (b.x2 - b.x1) * (b.y2 - b.y1);
-        float unionArea = areaA + areaB - interArea;
-
-        return unionArea <= 0f ? 0f : interArea / unionArea;
     }
 
     @Override

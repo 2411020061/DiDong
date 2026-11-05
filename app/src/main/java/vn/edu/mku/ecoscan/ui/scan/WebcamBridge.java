@@ -4,13 +4,11 @@ import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.os.Build;
 
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
-import java.util.Locale;
 
 /** Local Windows webcam bridge used only by debug builds on Android emulators. */
 final class WebcamBridge {
@@ -23,13 +21,7 @@ final class WebcamBridge {
 
     static boolean canUse(Context context) {
         if ((context.getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) == 0) return false;
-        if (!token(context).isEmpty()) return true;
-        String hardware = Build.HARDWARE.toLowerCase(Locale.US);
-        String fingerprint = Build.FINGERPRINT.toLowerCase(Locale.US);
-        return hardware.contains("vbox") || hardware.contains("ranchu")
-                || hardware.contains("goldfish") || fingerprint.contains("generic")
-                || fingerprint.contains("emulator")
-                || Build.MODEL.toLowerCase(Locale.US).contains("ldplayer");
+        return !token(context).isEmpty();
     }
 
     static String host(Context context) {
@@ -47,6 +39,11 @@ final class WebcamBridge {
         if (token.isEmpty()) throw new IllegalArgumentException("Cần mã ghép nối");
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
                 .putString(KEY_HOST, host).putString(KEY_TOKEN, token).apply();
+    }
+
+    static void clearConnection(Context context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .remove(KEY_TOKEN).apply();
     }
 
     static boolean validHost(String host) {
